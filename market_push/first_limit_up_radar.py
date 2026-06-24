@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from xml.etree import ElementTree as ET
 
-from a_share_map import leader_line, match_bucket
+from a_share_map import match_bucket
 from brief_style import cls_header, color_bar, soft_panel_end, soft_panel_start
 from http_utils import fetch_text
 from news_radar import clean_text, dedupe_key, is_low_quality_source, is_market_recap
@@ -67,6 +67,92 @@ THEME_RULES = [
         "aliases": ["军工", "卫星", "导弹", "商业航天", "火箭", "航发"],
     },
 ]
+
+
+DEEP_BUCKET_TEMPLATES = {
+    "AI算力/液冷/服务器": {
+        "deep_mapping": "更深层通常不只是单个订单或公告，而是是否切入 AI 资本开支扩散链条，包括服务器、液冷、电源、连接和国产替代。",
+        "hidden_angle": "市场首日常只交易公告标题，第二天才会去挖它在核心客户链中的位置，以及是否属于低位补涨的细分环节。",
+        "path": "个股首板 -> 算力细分补涨 -> 服务器/液冷/连接件扩散",
+        "mispriced": "大多数散户只会看到“AI概念”四个字，不会继续拆到它究竟受益哪一段资本开支。",
+    },
+    "半导体/存储/先进封装": {
+        "deep_mapping": "更值得挖的是产线验证、国产替代、扩产节奏和下游客户导入，而不只是单一芯片/设备新闻。",
+        "hidden_angle": "如果公司处在设备、材料、封测这些中游环节，首日容易被忽略，后续反而可能成为同链条补涨。",
+        "path": "个股首板 -> 同环节低位补涨 -> 设备/材料/封测联动",
+        "mispriced": "市场经常先炒设计或大票，真正的边际变化可能发生在中游制造链。",
+    },
+    "PCB/消费电子": {
+        "deep_mapping": "深层预期差往往在新机型导入、单机价值量提升、工艺升级或大客户份额切换。",
+        "hidden_angle": "如果公司不是整机龙头，而是材料、结构件、PCB、显示链条，散户通常不容易第一天想到它的弹性。",
+        "path": "个股首板 -> 苹果链/AI 终端链扩散 -> 配套零部件跟涨",
+        "mispriced": "公开标题只会说消费电子回暖，但不会直接告诉你是哪条供应链在吃增量。",
+    },
+    "机器人/自动驾驶": {
+        "deep_mapping": "真正能发酵的不是“机器人概念”本身，而是有没有切到核心零部件验证、车厂导入、量产节奏或新客户。",
+        "hidden_angle": "如果公司是减速器、丝杠、电机、传感器这类隐蔽零部件，市场首日可能只把它当概念票。",
+        "path": "个股首板 -> 零部件补涨 -> 机器人/智驾板块共振",
+        "mispriced": "散户更容易盯住整机和热门概念名词，忽略真正有壁垒的配套环节。",
+    },
+    "低空经济/商业航天": {
+        "deep_mapping": "更深层要看的是空域、运营、试点、适航、军民融合和订单兑现，不只是“低空经济”标题本身。",
+        "hidden_angle": "很多票真正的预期差在运营牌照、地方试点或配套环节，而不是飞行器制造本体。",
+        "path": "个股首板 -> 地方试点/运营链扩散 -> 低空全链条轮动",
+        "mispriced": "市场容易先炒概念标识度，后面才去挖哪些公司真正能承接产业落地。",
+    },
+    "新能源/储能/固态电池": {
+        "deep_mapping": "更深层往往在价差修复、客户结构、技术路线切换、储能渗透或材料环节的盈利弹性。",
+        "hidden_angle": "如果首板表面因为订单或业绩，后续真正的预期差可能是单吨盈利改善或切入更高景气子赛道。",
+        "path": "个股首板 -> 材料/设备/储能链扩散 -> 中报预期强化",
+        "mispriced": "散户通常只盯锂价和整车销量，不会马上穿透到细分材料或储能端的弹性。",
+    },
+    "创新药/医疗器械": {
+        "deep_mapping": "深层预期差往往在适应症扩展、商业化节奏、海外授权或器械放量，不只是单一批文新闻。",
+        "hidden_angle": "如果公司只是因为阶段性数据上板，后续还要看能否延伸成估值重估和同赛道映射。",
+        "path": "个股首板 -> 同靶点/同器械链补涨 -> 医药情绪扩散",
+        "mispriced": "新闻会说获批或临床，但不会直接反映商业化空间和同类标的映射。",
+    },
+    "资源品/黄金/有色": {
+        "deep_mapping": "更深层通常在于供给约束、涨价持续性和利润弹性，而不是当天单一商品涨跌。",
+        "hidden_angle": "如果公司兼具资源属性和加工属性，市场可能首日只按资源股处理，忽略利润弹性的层级差。",
+        "path": "个股首板 -> 同品种低位补涨 -> 资源链与加工链扩散",
+        "mispriced": "散户往往只看商品价格，不会细分谁的盈利弹性最大、谁只是跟风。",
+    },
+    "军工/航空发动机": {
+        "deep_mapping": "深层预期差通常在型号放量、配套环节渗透、军贸、商航或新材料替代。",
+        "hidden_angle": "首日如果只是军工情绪驱动，后面真正能走出来的是有型号绑定和放量逻辑的细分公司。",
+        "path": "个股首板 -> 配套环节补涨 -> 军工细分扩散",
+        "mispriced": "散户更容易笼统看军工，不会马上拆到具体型号和配套链条。",
+    },
+    "政策/信创/工业互联网": {
+        "deep_mapping": "更深层要看订单兑现、地方国资推动、国产替代节奏以及是否能从主题走到收入确认。",
+        "hidden_angle": "如果只是政策标题上板，后续能不能发酵取决于公司是不是政策执行链中的受益主体。",
+        "path": "个股首板 -> 同政策方向扩散 -> 信创/工业软件补涨",
+        "mispriced": "很多人只会看到政策热词，不会区分谁是真受益、谁只是蹭概念。",
+    },
+}
+
+
+TRIGGER_OVERRIDES = {
+    "并购重组/股权变动": {
+        "deep": "真正的预期差通常不在公告本身，而在资产注入质量、控制权稳定后是否会触发估值体系重构。",
+        "hidden": "散户通常只看“重组”两个字，容易忽略后续资产质量、注入节奏和壳价值重估。",
+        "path": "公告刺激 -> 资产注入预期发酵 -> 同类重组票联动",
+        "mispriced": "如果市场首日只当事件股处理，第二天才可能开始重估资产弹性。",
+    },
+    "订单/中标/合作": {
+        "deep": "更深层往往是客户验证和份额切换，而不只是订单金额本身。",
+        "hidden": "如果这是切入核心客户链的第一次验证，后续预期差可能比订单金额更大。",
+        "path": "订单首板 -> 客户链映射 -> 同供应链补涨",
+        "mispriced": "散户通常只看订单数额，不会第一时间判断客户层级和持续性。",
+    },
+    "业绩/预增/扭亏": {
+        "deep": "更深层要分辨是一次性修复，还是单吨盈利、稼动率、客户结构共同改善。",
+        "hidden": "如果利润改善能延续到中报预告，这种票容易从事件驱动走向业绩驱动。",
+        "path": "业绩首板 -> 中报预期加强 -> 同行业低估值修复",
+        "mispriced": "市场首日常只看同比，未必会细拆利润质量和持续性。",
+    },
+}
 
 
 def chunked(items, size):
@@ -255,6 +341,60 @@ def classify_themes(text: str) -> list[str]:
     return hits
 
 
+def market_style_hint(stock: dict) -> str:
+    code = stock["code"]
+    if code.startswith(("300", "301", "688")):
+        return "20cm/科创属性意味着弹性更高，若题材成立更容易被短线资金反复强化。"
+    amount = stock.get("amount_yi", 0)
+    if amount and amount < 12:
+        return "成交额不算大，若次日情绪延续，容易被资金当成同题材高弹性载体。"
+    if amount and amount > 50:
+        return "成交额较大，若还能继续走强，说明这不只是纯情绪板，更可能带板块容量。"
+    return "容量中等，若出现同题材扩散，容易在龙头与补涨之间承担情绪中继角色。"
+
+
+def pick_deep_template(main_reason: str, bucket_name: str) -> dict:
+    override = TRIGGER_OVERRIDES.get(main_reason)
+    bucket_tpl = DEEP_BUCKET_TEMPLATES.get(bucket_name) or DEEP_BUCKET_TEMPLATES.get("政策/信创/工业互联网")
+    return {
+        "deep": (override or {}).get("deep") or bucket_tpl["deep_mapping"],
+        "hidden": (override or {}).get("hidden") or bucket_tpl["hidden_angle"],
+        "path": (override or {}).get("path") or bucket_tpl["path"],
+        "mispriced": (override or {}).get("mispriced") or bucket_tpl["mispriced"],
+    }
+
+
+def derive_signal_lines(stock: dict, news_items: list[dict], main_reason: str, bucket_name: str) -> dict:
+    text = " ".join(f"{item['title']} {item['desc']}" for item in news_items).lower()
+    template = pick_deep_template(main_reason, bucket_name)
+
+    deep_parts = [template["deep"]]
+    hidden_parts = [template["hidden"]]
+    mispriced_parts = [template["mispriced"], market_style_hint(stock)]
+
+    if any(word in text for word in ["订单", "中标", "客户", "供货", "合作", "框架协议"]):
+        hidden_parts.append("更值得盯的是这是不是首次切入更高等级客户，或者从边缘供应商变成主供。")
+    if any(word in text for word in ["扩产", "量产", "投产", "产能", "放量"]):
+        deep_parts.append("如果背后是产能爬坡或量产验证，后续预期差通常会从题材转向业绩兑现。")
+    if any(word in text for word in ["预增", "扭亏", "增长", "中报", "净利润", "业绩"]):
+        hidden_parts.append("若利润改善不是一次性项目，而是毛利率和稼动率同步修复，中报预告阶段还可能再被重估。")
+    if any(word in text for word in ["控制权", "并购", "重组", "股权转让", "注入"]):
+        deep_parts.append("后续真正的弹性要看注入资产质量和是否触发资产负债表、估值体系双重重估。")
+    if any(word in text for word in ["涨价", "短缺", "供给", "禁运", "稀缺"]):
+        hidden_parts.append("如果首板背后是供给端变化，第二天市场往往会去挖同链条更低位、更高弹性的补涨票。")
+    if any(word in text for word in ["试点", "政策", "会议", "指导意见", "规划"]):
+        deep_parts.append("若有政策/试点推进，发酵不一定停在个股，容易扩散到同地区或同环节公司。")
+    if not news_items:
+        mispriced_parts.append("目前公开线索不强，反而说明若次日继续超预期，资金可能在交易隐含题材身份而不是显性新闻。")
+
+    return {
+        "deep_mapping": " ".join(dict.fromkeys(deep_parts)),
+        "hidden_angle": " ".join(dict.fromkeys(hidden_parts)),
+        "fermentation_path": template["path"],
+        "why_mispriced": " ".join(dict.fromkeys(mispriced_parts)),
+    }
+
+
 def summarize_news(stock: dict, news_items: list[dict]) -> dict:
     if not news_items:
         bucket = match_bucket(title=stock["name"])
@@ -348,10 +488,12 @@ def build_pool(top_n: int, min_amount_yuan: float) -> list[dict]:
                 news_items = []
             summary = summarize_news(stock, news_items)
             bucket = match_bucket(title=stock["name"], desc=" ".join(item["title"] for item in news_items[:4]))
+            deep = derive_signal_lines(stock, news_items, summary["main_reason"], bucket["name"])
             enriched.append(
                 {
                     **stock,
                     **summary,
+                    **deep,
                     "leaders": f"{bucket['name']}：{'、'.join(bucket['leaders'][:4])}",
                 }
             )
@@ -398,7 +540,15 @@ def format_report(items: list[dict], top_n: int) -> tuple[str, str]:
                 "",
                 f"**公开线索**：{item['summary']}",
                 "",
+                f"**深层产业映射**：{item['deep_mapping']}",
+                "",
                 f"**潜在预期差**：{other_angles}",
+                "",
+                f"**隐藏预期差**：{item['hidden_angle']}",
+                "",
+                f"**次日发酵路径**：{item['fermentation_path']}",
+                "",
+                f"**为什么可能还没充分交易**：{item['why_mispriced']}",
                 "",
                 f"**同题材观察**：{item['leaders']}",
                 "",
