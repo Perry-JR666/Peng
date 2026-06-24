@@ -10,6 +10,7 @@ from xml.etree import ElementTree as ET
 
 from a_share_map import match_bucket
 from brief_style import cls_header, color_bar, soft_panel_end, soft_panel_start
+from company_profiles import get_profile
 from http_utils import fetch_text
 from news_radar import clean_text, dedupe_key, is_low_quality_source, is_market_recap
 from pushplus_client import send_pushplus
@@ -367,10 +368,13 @@ def pick_deep_template(main_reason: str, bucket_name: str) -> dict:
 def derive_signal_lines(stock: dict, news_items: list[dict], main_reason: str, bucket_name: str) -> dict:
     text = " ".join(f"{item['title']} {item['desc']}" for item in news_items).lower()
     template = pick_deep_template(main_reason, bucket_name)
+    profile = get_profile(stock["code"])
 
     deep_parts = [template["deep"]]
     hidden_parts = [template["hidden"]]
     mispriced_parts = [template["mispriced"], market_style_hint(stock)]
+    business_parts = []
+    chain_parts = []
 
     if any(word in text for word in ["订单", "中标", "客户", "供货", "合作", "框架协议"]):
         hidden_parts.append("更值得盯的是这是不是首次切入更高等级客户，或者从边缘供应商变成主供。")
@@ -386,8 +390,20 @@ def derive_signal_lines(stock: dict, news_items: list[dict], main_reason: str, b
         deep_parts.append("若有政策/试点推进，发酵不一定停在个股，容易扩散到同地区或同环节公司。")
     if not news_items:
         mispriced_parts.append("目前公开线索不强，反而说明若次日继续超预期，资金可能在交易隐含题材身份而不是显性新闻。")
+    if profile:
+        business_parts.append(profile["business"])
+        if profile.get("products"):
+            business_parts.append(f"核心产品：{'、'.join(profile['products'][:4])}。")
+        chain_parts.append(profile["supply_chain"])
+        chain_parts.append(profile["customers"])
+        for point in profile.get("hidden_points") or []:
+            hidden_parts.append(point)
+    else:
+        chain_parts.append(f"当前主要按 {bucket_name} 题材身份映射，后续可补充更细的客户与产品数据库。")
 
     return {
+        "business_profile": " ".join(dict.fromkeys(business_parts)) if business_parts else "暂无本地业务画像，当前主要基于题材与公告线索推断。",
+        "supply_chain_view": " ".join(dict.fromkeys(chain_parts)),
         "deep_mapping": " ".join(dict.fromkeys(deep_parts)),
         "hidden_angle": " ".join(dict.fromkeys(hidden_parts)),
         "fermentation_path": template["path"],
@@ -539,6 +555,10 @@ def format_report(items: list[dict], top_n: int) -> tuple[str, str]:
                 f"**首板主因**：{item['main_reason']}",
                 "",
                 f"**公开线索**：{item['summary']}",
+                "",
+                f"**公司业务画像**：{item['business_profile']}",
+                "",
+                f"**供应链/客户映射**：{item['supply_chain_view']}",
                 "",
                 f"**深层产业映射**：{item['deep_mapping']}",
                 "",
