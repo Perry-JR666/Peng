@@ -1,10 +1,9 @@
 import json
 import os
-import time
 import urllib.request
 
 
-PUSHPLUS_SEND_URL = "http://www.pushplus.plus/send"
+PUSHPLUS_SEND_URL = "https://www.pushplus.plus/send"
 
 
 def _env(name: str, default: str = "") -> str:
@@ -22,7 +21,6 @@ def send_pushplus(title: str, content: str) -> dict:
         "content": content,
         "template": "markdown",
         "channel": _env("PUSHPLUS_CHANNEL", "wechat") or "wechat",
-        "timestamp": str(int(time.time() * 1000)),
     }
     topic = _env("PUSHPLUS_TOPIC")
     if topic:
