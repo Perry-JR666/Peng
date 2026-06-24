@@ -1,11 +1,13 @@
 import json
 import os
 import re
+import time
 import urllib.request
 
 
 PUSHPLUS_SEND_URL = "https://www.pushplus.plus/send"
 PUSHPLUS_MAX_CHARS = 12000
+PUSHPLUS_CHUNK_DELAY_SEC = 1.5
 
 
 def _env(name: str, default: str = "") -> str:
@@ -45,6 +47,20 @@ def send_pushplus(title: str, content: str) -> dict:
     if code != 200:
         raise RuntimeError(f"PushPlus send failed: {result}")
     return result
+
+
+def send_pushplus_with_retry(title: str, content: str, retries: int = 3) -> dict:
+    last_error = None
+    for attempt in range(retries + 1):
+        try:
+            return send_pushplus(title, content)
+        except RuntimeError as exc:
+            last_error = exc
+            message = str(exc)
+            if "推送频率过快" not in message or attempt >= retries:
+                raise
+            time.sleep(PUSHPLUS_CHUNK_DELAY_SEC * (attempt + 2))
+    raise last_error
 
 
 def _split_content(content: str, max_chars: int = PUSHPLUS_MAX_CHARS) -> list[str]:
@@ -98,5 +114,7 @@ def send_pushplus_chunked(title: str, content: str, max_chars: int = PUSHPLUS_MA
     total = len(parts)
     for idx, part in enumerate(parts, 1):
         part_title = title if total == 1 else f"{title} ({idx}/{total})"
-        results.append(send_pushplus(part_title, part))
+        if idx > 1:
+            time.sleep(PUSHPLUS_CHUNK_DELAY_SEC)
+        results.append(send_pushplus_with_retry(part_title, part))
     return results
