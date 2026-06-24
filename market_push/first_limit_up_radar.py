@@ -17,6 +17,7 @@ from pushplus_client import send_pushplus
 
 CN_TZ = timezone(timedelta(hours=8))
 TENCENT_HEADERS = {"Referer": "https://gu.qq.com/", "User-Agent": "Mozilla/5.0"}
+EASTMONEY_HEADERS = {"Referer": "https://quote.eastmoney.com/", "User-Agent": "Mozilla/5.0"}
 
 
 THEME_RULES = [
@@ -194,7 +195,7 @@ def fetch_kline(secid: str) -> list[dict]:
     )
     import json as _json
 
-    data = _json.loads(fetch_text(url, timeout=12, retries=1))
+    data = _json.loads(fetch_text(url, timeout=12, retries=2, headers=EASTMONEY_HEADERS))
     rows = []
     for line in (data.get("data") or {}).get("klines") or []:
         parts = line.split(",")
@@ -228,7 +229,10 @@ def is_limit_up(row: dict, market: str, code: str) -> bool:
 
 
 def analyze_stock(stock: dict) -> dict | None:
-    rows = fetch_kline(stock["secid"])
+    try:
+        rows = fetch_kline(stock["secid"])
+    except Exception:
+        return None
     if len(rows) < 3:
         return None
     last = rows[-1]
@@ -327,7 +331,10 @@ def build_pool(top_n: int, min_amount_yuan: float) -> list[dict]:
     with ThreadPoolExecutor(max_workers=workers) as executor:
         futures = [executor.submit(analyze_stock, stock) for stock in quotes]
         for future in as_completed(futures):
-            item = future.result()
+            try:
+                item = future.result()
+            except Exception:
+                item = None
             if item:
                 first_boards.append(item)
     first_boards.sort(key=lambda x: (x["amount"], x["pct"]), reverse=True)
@@ -338,7 +345,10 @@ def build_pool(top_n: int, min_amount_yuan: float) -> list[dict]:
         futures = {executor.submit(collect_news_for_stock, stock): stock for stock in selected}
         for future in as_completed(futures):
             stock = futures[future]
-            news_items = future.result()
+            try:
+                news_items = future.result()
+            except Exception:
+                news_items = []
             summary = summarize_news(stock, news_items)
             bucket = match_bucket(title=stock["name"], desc=" ".join(item["title"] for item in news_items[:4]))
             enriched.append(
