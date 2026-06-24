@@ -13,7 +13,7 @@ from brief_style import cls_header, color_bar, soft_panel_end, soft_panel_start
 from company_profiles import get_profile
 from http_utils import fetch_text
 from news_radar import clean_text, dedupe_key, is_low_quality_source, is_market_recap
-from pushplus_client import send_pushplus
+from pushplus_client import send_pushplus_chunked
 
 
 CN_TZ = timezone(timedelta(hours=8))
@@ -599,7 +599,7 @@ def main():
     if args.dry_run:
         print(content)
     else:
-        result = send_pushplus(title, content)
+        result = send_pushplus_chunked(title, content)
         print(json.dumps(result, ensure_ascii=False))
 
 
