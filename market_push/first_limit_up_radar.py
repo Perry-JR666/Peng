@@ -10,16 +10,13 @@ from xml.etree import ElementTree as ET
 
 from a_share_map import leader_line, match_bucket
 from brief_style import cls_header, color_bar, soft_panel_end, soft_panel_start
-from http_utils import fetch_text, url_with_params
+from http_utils import fetch_text
 from news_radar import clean_text, dedupe_key, is_low_quality_source, is_market_recap
 from pushplus_client import send_pushplus
 
 
 CN_TZ = timezone(timedelta(hours=8))
 TENCENT_HEADERS = {"Referer": "https://gu.qq.com/", "User-Agent": "Mozilla/5.0"}
-EASTMONEY_HEADERS = {"Referer": "https://quote.eastmoney.com/", "User-Agent": "Mozilla/5.0"}
-
-
 THEME_RULES = [
     {
         "name": "并购重组/股权变动",
@@ -159,6 +156,8 @@ def fetch_candidate_quotes(min_amount_yuan: float) -> list[dict]:
                 continue
             if "ST" in name or "退" in name:
                 continue
+            if name.startswith(("N", "C")):
+                continue
             limit_pct = board_limit_ratio(market, code) * 100
             tolerance = 0.6 if limit_pct >= 20 else 0.35
             if pct < limit_pct - tolerance:
@@ -177,29 +176,17 @@ def fetch_candidate_quotes(min_amount_yuan: float) -> list[dict]:
     return stocks
 
 
-def fetch_kline(secid: str) -> list[dict]:
-    now = datetime.now(CN_TZ)
-    beg = (now - timedelta(days=40)).strftime("%Y%m%d")
-    end = now.strftime("%Y%m%d")
-    url = url_with_params(
-        "https://push2his.eastmoney.com/api/qt/stock/kline/get",
-        {
-            "secid": secid,
-            "fields1": "f1,f2,f3,f4,f5",
-            "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
-            "klt": 101,
-            "fqt": 1,
-            "beg": beg,
-            "end": end,
-        },
-    )
+def fetch_kline(market: str, code: str) -> list[dict]:
+    symbol = f"{market}{code}"
+    url = f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param={symbol},day,,,40,qfq"
     import json as _json
 
-    data = _json.loads(fetch_text(url, timeout=12, retries=2, headers=EASTMONEY_HEADERS))
+    data = _json.loads(fetch_text(url, timeout=12, retries=2, headers=TENCENT_HEADERS))
+    stock_data = ((data.get("data") or {}).get(symbol) or {})
+    lines = stock_data.get("qfqday") or stock_data.get("day") or []
     rows = []
-    for line in (data.get("data") or {}).get("klines") or []:
-        parts = line.split(",")
-        if len(parts) < 11:
+    for parts in lines:
+        if len(parts) < 6:
             continue
         try:
             rows.append(
@@ -210,15 +197,24 @@ def fetch_kline(secid: str) -> list[dict]:
                     "high": float(parts[3]),
                     "low": float(parts[4]),
                     "vol": float(parts[5]),
-                    "amount": float(parts[6]),
-                    "amp": float(parts[7]),
-                    "pct": float(parts[8]),
-                    "chg": float(parts[9]),
-                    "turn": float(parts[10]),
+                    "amount": 0.0,
+                    "amp": 0.0,
+                    "pct": 0.0,
+                    "chg": 0.0,
+                    "turn": 0.0,
                 }
             )
         except ValueError:
             continue
+    for idx in range(1, len(rows)):
+        prev_close = rows[idx - 1]["close"]
+        cur = rows[idx]
+        if prev_close:
+            cur["chg"] = cur["close"] - prev_close
+            cur["pct"] = (cur["close"] - prev_close) / prev_close * 100
+    if rows:
+        rows[0]["chg"] = 0.0
+        rows[0]["pct"] = 0.0
     return rows
 
 
@@ -230,7 +226,7 @@ def is_limit_up(row: dict, market: str, code: str) -> bool:
 
 def analyze_stock(stock: dict) -> dict | None:
     try:
-        rows = fetch_kline(stock["secid"])
+        rows = fetch_kline(stock["market"], stock["code"])
     except Exception:
         return None
     if len(rows) < 3:
