@@ -11,6 +11,7 @@
 
 - 08:00：隔夜全球情报，包括全球产业利好、技术突破、美股指数涨跌和热门板块表现。
 - 15:45：筛选“风华高科式分歧回踩试错”个股。
+- 16:05：整理当日重点首板涨停股的涨停主因，并深挖次日可能继续发酵的预期差。
 - 22:30：整理隔日可能被 A 股资金炒作的国内外行业热点。
 
 ## 数据来源和排序
@@ -31,6 +32,7 @@
 
 - `08:00` 早报
 - `15:45` 形态筛选
+- `16:05` 首板涨停预期差
 - `22:30` 晚报热点雷达
 
 注意：GitHub Actions 的 `cron` 用的是 UTC，上面的工作流已经换算好了，不需要你再改时区。
@@ -54,6 +56,8 @@ OPENAI_API_KEY=可选
 OPENAI_MODEL=gpt-5.4
 STOCK_TOP_N=10
 STOCK_MIN_AMOUNT_YUAN=120000000
+FIRST_LIMIT_TOP_N=10
+FIRST_LIMIT_MIN_AMOUNT_YUAN=150000000
 NEWS_TOP_N=10
 NEWS_MAX_PER_THEME=2
 MORNING_TOP_N=10
@@ -65,6 +69,7 @@ MORNING_TOP_N=10
 
 - `morning_brief`
 - `stock_shape`
+- `first_limit_up_radar`
 - `news_radar`
 
 如果手动运行成功，后续定时任务就会按计划自动发到手机。
@@ -104,6 +109,7 @@ OPENAI_MODEL=gpt-5.4
 ```bash
 python run_morning_brief.py --dry-run
 python run_stock_shape.py --dry-run
+python run_first_limit_up_radar.py --dry-run
 python run_news_radar.py --dry-run
 ```
 
@@ -112,6 +118,7 @@ python run_news_radar.py --dry-run
 ```bash
 python run_morning_brief.py
 python run_stock_shape.py
+python run_first_limit_up_radar.py
 python run_news_radar.py
 ```
 
@@ -136,6 +143,7 @@ bash install_cron.sh /path/to/market_push
 ```cron
 0 8 * * * cd /path/to/market_push && ... python run_morning_brief.py
 45 15 * * 1-5 cd /path/to/market_push && ... python run_stock_shape.py
+5 16 * * 1-5 cd /path/to/market_push && ... python run_first_limit_up_radar.py
 30 22 * * * cd /path/to/market_push && ... python run_news_radar.py
 ```
 

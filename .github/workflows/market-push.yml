@@ -4,6 +4,7 @@ on:
   schedule:
     - cron: "0 0 * * *"
     - cron: "45 7 * * 1-5"
+    - cron: "5 8 * * 1-5"
     - cron: "30 14 * * *"
   workflow_dispatch:
     inputs:
@@ -15,6 +16,7 @@ on:
         options:
           - morning_brief
           - stock_shape
+          - first_limit_up_radar
           - news_radar
 
 jobs:
@@ -43,6 +45,7 @@ jobs:
             case "${{ github.event.schedule }}" in
               "0 0 * * *") task="morning_brief" ;;
               "45 7 * * 1-5") task="stock_shape" ;;
+              "5 8 * * 1-5") task="first_limit_up_radar" ;;
               "30 14 * * *") task="news_radar" ;;
               *) echo "Unknown schedule: ${{ github.event.schedule }}" >&2; exit 1 ;;
             esac
@@ -59,6 +62,8 @@ jobs:
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.4' }}
           STOCK_TOP_N: ${{ vars.STOCK_TOP_N || '10' }}
           STOCK_MIN_AMOUNT_YUAN: ${{ vars.STOCK_MIN_AMOUNT_YUAN || '120000000' }}
+          FIRST_LIMIT_TOP_N: ${{ vars.FIRST_LIMIT_TOP_N || '10' }}
+          FIRST_LIMIT_MIN_AMOUNT_YUAN: ${{ vars.FIRST_LIMIT_MIN_AMOUNT_YUAN || '150000000' }}
           NEWS_TOP_N: ${{ vars.NEWS_TOP_N || '10' }}
           NEWS_MAX_PER_THEME: ${{ vars.NEWS_MAX_PER_THEME || '2' }}
           MORNING_TOP_N: ${{ vars.MORNING_TOP_N || '10' }}
