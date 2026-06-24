@@ -1,10 +1,11 @@
 import json
 import os
+import re
 import urllib.request
 
 
 PUSHPLUS_SEND_URL = "https://www.pushplus.plus/send"
-PUSHPLUS_MAX_CHARS = 18000
+PUSHPLUS_MAX_CHARS = 12000
 
 
 def _env(name: str, default: str = "") -> str:
@@ -52,9 +53,12 @@ def _split_content(content: str, max_chars: int = PUSHPLUS_MAX_CHARS) -> list[st
 
     chunks = []
     current = ""
-    blocks = content.split("\n---\n")
+    blocks = re.split(r"\n\s*---\s*\n", content)
     for block in blocks:
-        candidate = block if not current else current + "\n---\n" + block
+        block = block.strip()
+        if not block:
+            continue
+        candidate = block if not current else current + "\n\n---\n\n" + block
         if len(candidate) <= max_chars:
             current = candidate
             continue
@@ -64,10 +68,25 @@ def _split_content(content: str, max_chars: int = PUSHPLUS_MAX_CHARS) -> list[st
         if len(block) <= max_chars:
             current = block
             continue
-        start = 0
-        while start < len(block):
-            chunks.append(block[start : start + max_chars])
-            start += max_chars
+        paragraphs = [p for p in block.split("\n\n") if p.strip()]
+        para_current = ""
+        for para in paragraphs:
+            para_candidate = para if not para_current else para_current + "\n\n" + para
+            if len(para_candidate) <= max_chars:
+                para_current = para_candidate
+                continue
+            if para_current:
+                chunks.append(para_current)
+                para_current = ""
+            if len(para) <= max_chars:
+                para_current = para
+                continue
+            start = 0
+            while start < len(para):
+                chunks.append(para[start : start + max_chars])
+                start += max_chars
+        if para_current:
+            current = para_current
     if current:
         chunks.append(current)
     return chunks
