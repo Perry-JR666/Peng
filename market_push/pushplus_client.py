@@ -7,7 +7,7 @@ import urllib.request
 
 PUSHPLUS_SEND_URL = "https://www.pushplus.plus/send"
 PUSHPLUS_MAX_CHARS = 12000
-PUSHPLUS_CHUNK_DELAY_SEC = 1.5
+PUSHPLUS_CHUNK_DELAY_SEC = 3.0
 
 
 def _env(name: str, default: str = "") -> str:
@@ -59,7 +59,7 @@ def send_pushplus_with_retry(title: str, content: str, retries: int = 3) -> dict
             message = str(exc)
             if "推送频率过快" not in message or attempt >= retries:
                 raise
-            time.sleep(PUSHPLUS_CHUNK_DELAY_SEC * (attempt + 2))
+            time.sleep(PUSHPLUS_CHUNK_DELAY_SEC * (2 ** attempt))
     raise last_error
 
 
