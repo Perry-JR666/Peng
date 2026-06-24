@@ -1,0 +1,5 @@
+market_push/.env
+market_push/__pycache__/
+*.pyc
+tmp_git_install/
+SmartX标准版_中泰证券_3.6.18.exe

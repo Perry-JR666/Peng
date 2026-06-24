@@ -1,0 +1,66 @@
+name: market-push
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+    - cron: "45 7 * * 1-5"
+    - cron: "30 14 * * *"
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Which task to run"
+        required: true
+        default: "news_radar"
+        type: choice
+        options:
+          - morning_brief
+          - stock_shape
+          - news_radar
+
+jobs:
+  run-task:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+        working-directory: market_push
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Select task
+        id: select
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            task="${{ inputs.task }}"
+          else
+            case "${{ github.event.schedule }}" in
+              "0 0 * * *") task="morning_brief" ;;
+              "45 7 * * 1-5") task="stock_shape" ;;
+              "30 14 * * *") task="news_radar" ;;
+              *) echo "Unknown schedule: ${{ github.event.schedule }}" >&2; exit 1 ;;
+            esac
+          fi
+          echo "task=$task" >> "$GITHUB_OUTPUT"
+
+      - name: Run task
+        env:
+          TZ: Asia/Shanghai
+          PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
+          PUSHPLUS_TOPIC: ${{ secrets.PUSHPLUS_TOPIC }}
+          PUSHPLUS_CHANNEL: ${{ secrets.PUSHPLUS_CHANNEL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.4' }}
+          STOCK_TOP_N: ${{ vars.STOCK_TOP_N || '10' }}
+          STOCK_MIN_AMOUNT_YUAN: ${{ vars.STOCK_MIN_AMOUNT_YUAN || '120000000' }}
+          NEWS_TOP_N: ${{ vars.NEWS_TOP_N || '10' }}
+          NEWS_MAX_PER_THEME: ${{ vars.NEWS_MAX_PER_THEME || '2' }}
+          MORNING_TOP_N: ${{ vars.MORNING_TOP_N || '10' }}
+        run: |
+          python "run_${{ steps.select.outputs.task }}.py"
