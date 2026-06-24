@@ -13,11 +13,12 @@ from brief_style import cls_header, color_bar, soft_panel_end, soft_panel_start
 from company_profiles import get_profile
 from http_utils import fetch_text
 from news_radar import clean_text, dedupe_key, is_low_quality_source, is_market_recap
-from pushplus_client import send_pushplus_chunked
+from pushplus_client import send_pushplus
 
 
 CN_TZ = timezone(timedelta(hours=8))
 TENCENT_HEADERS = {"Referer": "https://gu.qq.com/", "User-Agent": "Mozilla/5.0"}
+FIRST_LIMIT_DETAIL_COUNT = int(os.environ.get("FIRST_LIMIT_DETAIL_COUNT", "8"))
 THEME_RULES = [
     {
         "name": "并购重组/股权变动",
@@ -542,7 +543,8 @@ def format_report(items: list[dict], top_n: int) -> tuple[str, str]:
         ]
     )
 
-    for idx, item in enumerate(items, 1):
+    detail_count = min(FIRST_LIMIT_DETAIL_COUNT, len(items))
+    for idx, item in enumerate(items[:detail_count], 1):
         other_angles = "、".join(item["other_angles"][:2]) if item["other_angles"] else "暂未识别出更强分支"
         lines.extend(
             [
@@ -583,6 +585,22 @@ def format_report(items: list[dict], top_n: int) -> tuple[str, str]:
             ]
         )
 
+    if len(items) > detail_count:
+        lines.extend(
+            [
+                "## 其余首板速览",
+                "",
+                "以下样本保留全量覆盖，但不逐只展开深挖，便于把整份推送控制在单条可发范围内。",
+                "",
+                "| 股票 | 涨幅 | 主因 | 潜在预期差 |",
+                "|---|---:|---|---|",
+            ]
+        )
+        for item in items[detail_count:]:
+            other_angles = "、".join(item["other_angles"][:2]) if item["other_angles"] else "题材待观察"
+            lines.append(f"| {item['name']} {item['code']} | {item['pct']:.2f}% | {item['main_reason']} | {other_angles} |")
+        lines.extend(["", "---", ""])
+
     lines.extend(["## 使用方式", "", "- 先看首板主因是不是你熟悉的主线；", "- 再看潜在预期差能不能延伸出次日板块扩散；", "- 如果只有个股自身新闻、没有行业映射，就更偏独立事件。"])
     return title, "\n".join(lines)
 
@@ -599,7 +617,7 @@ def main():
     if args.dry_run:
         print(content)
     else:
-        result = send_pushplus_chunked(title, content)
+        result = send_pushplus(title, content)
         print(json.dumps(result, ensure_ascii=False))
 
 
