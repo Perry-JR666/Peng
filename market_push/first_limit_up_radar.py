@@ -334,7 +334,8 @@ def build_pool(top_n: int, min_amount_yuan: float) -> list[dict]:
             if item:
                 first_boards.append(item)
     first_boards.sort(key=lambda x: (x["amount"], x["pct"]), reverse=True)
-    selected = first_boards[: top_n * 2]
+    limit_all = top_n <= 0
+    selected = first_boards if limit_all else first_boards[: top_n * 2]
 
     enriched = []
     with ThreadPoolExecutor(max_workers=min(6, max(2, len(selected)))) as executor:
@@ -355,7 +356,7 @@ def build_pool(top_n: int, min_amount_yuan: float) -> list[dict]:
                 }
             )
     enriched.sort(key=lambda x: (x["amount"], x["pct"]), reverse=True)
-    return enriched[:top_n]
+    return enriched if limit_all else enriched[:top_n]
 
 
 def format_report(items: list[dict], top_n: int) -> tuple[str, str]:
@@ -374,7 +375,11 @@ def format_report(items: list[dict], top_n: int) -> tuple[str, str]:
 
     lines.extend(
         [
-            f"共筛出 {len(items)} 只重点样本，默认按成交额排序，最多展示 {top_n} 只。",
+            (
+                f"共筛出 {len(items)} 只首板涨停样本，默认按成交额排序，已展示全部样本。"
+                if top_n <= 0
+                else f"共筛出 {len(items)} 只重点样本，默认按成交额排序，最多展示 {top_n} 只。"
+            ),
             "",
         ]
     )
@@ -415,7 +420,7 @@ def format_report(items: list[dict], top_n: int) -> tuple[str, str]:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--top", type=int, default=int(os.environ.get("FIRST_LIMIT_TOP_N", "10")))
+    parser.add_argument("--top", type=int, default=int(os.environ.get("FIRST_LIMIT_TOP_N", "0")))
     args = parser.parse_args()
 
     min_amount = float(os.environ.get("FIRST_LIMIT_MIN_AMOUNT_YUAN", "150000000"))

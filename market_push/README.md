@@ -56,7 +56,7 @@ OPENAI_API_KEY=可选
 OPENAI_MODEL=gpt-5.4
 STOCK_TOP_N=10
 STOCK_MIN_AMOUNT_YUAN=120000000
-FIRST_LIMIT_TOP_N=10
+FIRST_LIMIT_TOP_N=0
 FIRST_LIMIT_MIN_AMOUNT_YUAN=150000000
 NEWS_TOP_N=10
 NEWS_MAX_PER_THEME=2
@@ -71,6 +71,8 @@ MORNING_TOP_N=10
 - `stock_shape`
 - `first_limit_up_radar`
 - `news_radar`
+
+说明：`FIRST_LIMIT_TOP_N=0` 表示推送全部首板涨停样本；如果你只想看前 N 只，再把它改成对应数字。
 
 如果手动运行成功，后续定时任务就会按计划自动发到手机。
 
