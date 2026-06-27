@@ -1,11 +1,6 @@
 name: market-push
 
 on:
-  schedule:
-    - cron: "0 0 * * *"
-    - cron: "45 7 * * 1-5"
-    - cron: "5 8 * * 1-5"
-    - cron: "30 14 * * *"
   workflow_dispatch:
     inputs:
       task:
@@ -42,13 +37,8 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             task="${{ inputs.task }}"
           else
-            case "${{ github.event.schedule }}" in
-              "0 0 * * *") task="morning_brief" ;;
-              "45 7 * * 1-5") task="stock_shape" ;;
-              "5 8 * * 1-5") task="first_limit_up_radar" ;;
-              "30 14 * * *") task="news_radar" ;;
-              *) echo "Unknown schedule: ${{ github.event.schedule }}" >&2; exit 1 ;;
-            esac
+            echo "Scheduled runs are currently paused." >&2
+            exit 1
           fi
           echo "task=$task" >> "$GITHUB_OUTPUT"
 
